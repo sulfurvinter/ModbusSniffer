@@ -69,39 +69,21 @@ Graficzny interfejs ModbusSniffer został zaprojektowany dla przejrzystości i u
 
 ## 📚 Jak To Działa
 
-ModbusSniffer jest zbudowany z modularną architekturą dla przejrzystości i łatwości utrzymania. Główne komponenty to:
+ModbusSniffer otwiera port szeregowy i pasywnie nasłuchuje przychodzącego strumienia danych. Ciągle skanuje surowy strumień bajtów w poszukiwaniu prawidłowych ramek Modbus RTU, używając specyficznych dla protokołu reguł czasu i struktury.
 
-```mermaid
-graph TD
-    A[GUI / CLI] --> B[Główny Logger]
-    B --> C[Przechwytywacz Szeregowy]
-    C --> D[Parser Modbus]
-    D --> E[Logger CSV]
-    B --> F[Narzędzia Przechwytywacza]
-```
-
-- **GUI/CLI**: Interfejsy użytkownika do uruchamiania/zatrzymywania przechwytywania i wyświetlania wyników.
-- **Główny Logger**: Koordynuje logowanie i aktualizacje GUI.
-- **Przechwytywacz Szeregowy**: Obsługuje komunikację przez port szeregowy i przechwytywanie surowych danych.
-- **Parser Modbus**: Dekoduje ramki Modbus RTU na czytelny format.
-- **Logger CSV**: Eksportuje dane do CSV na potrzeby analizy.
-- **Narzędzia Przechwytywacza**: Funkcje pomocnicze do przetwarzania danych.
-
----
-
-## Jak To Działa
-
-ModbusSniffer otwiera port szeregowy i pasywnie nasłuchuje przychodzącego strumienia danych. Ciągle skanuje surowy strumień bajtów w poszukiwaniu prawidłowych ramek Modbus RTU przy użyciu reguł specyficznych dla protokołu dotyczących czasu i struktury.
-
-Każda wykryta ramka jest dekodowana w celu wyodrębnienia kluczowych informacji, takich jak adres urządzenia, kod funkcji i zawartość danych.
+Każda wykryta ramka jest dekodowana w celu wyciągnięcia kluczowych informacji, takich jak adres urządzenia, kod funkcji i zawartość danych.
 
 W zależności od wybranego trybu i widoku:
 
-- W GUI ramki mogą być wyświetlane w tabeli na żywo z opcjami sortowania i filtrowania, lub pokazane w logu terminala, gdzie każda para żądanie-odpowiedź jest grupowana i kolorowana. Kolory alternatywne pomagają wizualnie oddzielać transakcje, a nieprawidłowe lub nieodpowiedziane ramki są wyróżnione na czerwono.
+- W GUI ramki mogą być:
+
+  - wyświetlane w widoku tabelarycznym w czasie rzeczywistym z opcjami sortowania i filtrowania, lub
+
+  - pokazywane w widoku logu podobnym do terminala, gdzie każda para żądanie-odpowiedź jest grupowana i kodowana kolorami. Naprzemienne kolory pomagają wizualnie oddzielić transakcje, a nieprawidłowe lub nieodpowiedziane ramki są wyróżnione na czerwono.
 
 - W CLI ramki są drukowane linia po linii do standardowego wyjścia. Format i szczegółowość wyjścia zależą od flag wiersza poleceń przekazanych przez użytkownika.
 
-> ℹ️ Wskazówka: Aby bezpiecznie, nieinwazyjnie monitorować ruch Modbus RTU, użyj pasywnego tapu RS-485 lub adaptera USB-to-RS485 skonfigurowanego do trybu tylko-odczytu. Pozwala to ModbusSniffer na przechwytywanie danych bez wysyłania lub zakłócania jakichkolwiek sygnałów na magistrali.
+> ℹ️ Wskazówka: Aby bezpiecznie, nieinwazyjnie monitorować ruch Modbus RTU, użyj pasywnego odgałęzienia RS-485 lub adaptera USB-to-RS485 skonfigurowanego tylko do nasłuchiwania. To pozwala ModbusSniffer na przechwytywanie danych bez wysyłania lub zakłócania jakichkolwiek sygnałów na magistrali.
 
 ---
 
@@ -203,7 +185,7 @@ Aby uzyskać więcej przykładów użycia, przewodnik deweloperski i instrukcje 
 👉 [ModbusSniffer na GitHub](https://github.com/niwciu/ModbusSniffer)  
 👉 [CONTRIBUTING.md](CONTRIBUTING.md)
 
-## Przykłady
+## 📋 Przykłady
 
 ### Podstawowe Przechwytywanie
 Uruchom GUI, wybierz port szeregowy (np. COM3 lub /dev/ttyUSB0), ustaw prędkość transmisji na 9600 i kliknij "Start". Wyświetlaj ramki na żywo w tabeli.
@@ -218,4 +200,23 @@ Użyj widoku tabeli, aby filtrować według ID urządzenia 1, monitoruj odczyty 
 
 ---
 
-## Współtworzenie
+## 🤝 Współtworzenie
+
+Witamy wkład!
+
+Jeśli chciałbyś ulepszyć ten projekt, naprawić błędy lub dodać nowe funkcje, zapoznaj się z przewodnikiem deweloperskim:
+
+📄 [CONTRIBUTING.md](CONTRIBUTING.md)
+
+## 📜 License
+
+Licencja MIT — szczegóły znajdziesz w pliku [LICENSE](https://github.com/niwciu/ModbusSniffer/blob/main/LICENSE).  
+Ten projekt jest forkiem [BADAndrea ModbusSniffer](https://github.com/BADAndrea/ModbusSniffer), utrzymywanym przez **niwciu** z ulepsszeniami opisanymi powyżej.
+
+---
+
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/f4825882-e285-4e02-a75c-68fc86ff5716" alt="myEmbeddedWayBanerWhiteSmaller"/>
+</div>
+
+---

@@ -8,7 +8,8 @@ Easily analyze and debug communication between PLCs, HMIs, and other Modbus RTU 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 <div align="center">
-<img src="https://github.com/niwciu/ModbusSniffer/blob/main/doc/gui.gif?raw=true" alt="Demo" />
+  <img src="https://niwciu.github.io/ModbusSniffer/gui.gif" alt="ModbusSniffer GUI demo" />
+  <p><em>Live preview of ModbusSniffer GUI in action</em></p>
 </div>
 
 ---
@@ -90,14 +91,14 @@ This includes formatters, linters, type checkers, test runners, and build tools.
 
 ---
 
-## � Acknowledgments
+## 🤝 Acknowledgments
 
 Thanks to the original author [BADAndrea](https://github.com/BADAndrea) for the initial ModbusSniffer implementation.  
 Special thanks to all contributors and the open-source community for feedback and improvements.
 
 ---
 
-## �📜 License
+## 📜 License
 
 This project is licensed under the MIT License — see the [LICENSE](https://github.com/niwciu/ModbusSniffer/blob/main/LICENSE) file.
 

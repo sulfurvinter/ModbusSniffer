@@ -9,6 +9,17 @@ nav:
   - API Reference: api.md
   - Contributing: CONTRIBUTING.md
 
+plugins:
+  - i18n:
+      languages:
+        - locale: en
+          name: English
+          default: true
+          build: true
+        - locale: pl
+          name: Polski
+          build: true
+
 theme:
   name: material
   language: en
@@ -47,7 +58,7 @@ markdown_extensions:
       custom_fences:
         - name: mermaid
           class: mermaid
-          format: !!python/name:pymdownx.superfences.fence_code_format
+          format: !!python/name:pymdownx.superfences.fence_div_format
   - pymdownx.highlight
   - pymdownx.inlinehilite
   - pymdownx.emoji:
@@ -59,8 +70,14 @@ markdown_extensions:
       custom_checkbox: true
 
 extra:
+  language_switcher:
+    label: "Select Language"
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/niwciu/ModbusSniffer
     - icon: fontawesome/solid/envelope
       link: mailto:niwciu@gmail.com
+
+extra_javascript:
+  - https://unpkg.com/mermaid@10.6.1/dist/mermaid.min.js
+  - js/mermaid-init.js

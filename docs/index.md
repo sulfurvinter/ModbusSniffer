@@ -42,16 +42,7 @@
 
 ---
 
-## � Screenshots
-
-<div align="center">
-  <img src="./img/gui-screenshot.png" alt="GUI Screenshot" width="600" />
-  <p><em>Main GUI interface showing live frame capture</em></p>
-</div>
-
----
-
-## �📦 Download & Installation
+## 📥 Download & Installation
 
 
 Download binary files for Ubuntu and Windows from [GitHub Releases](https://github.com/niwciu/ModbusSniffer/releases).

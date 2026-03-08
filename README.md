@@ -33,7 +33,7 @@ pip install modbus-sniffer
 ```
 or download Binary files for Ubuntu and Windows from [here](https://github.com/niwciu/ModbusSniffer/releases).
 
-You can also build and install app from sourcess. [Click here](CONTRIBUTING.md#%EF%B8%8F-build--install) for deatails about it.
+You can also build and install app from sourcess. [Click here](docs/installation.md) for deatails about it.
 
 
 ---
@@ -65,7 +65,7 @@ For more usage options, development guide, and installation from source, visit t
 ---
 ## 🤝 Contributing
 
-Please see [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and contribution guidelines.
+Please see [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for development setup and contribution guidelines.
 
 ---
 

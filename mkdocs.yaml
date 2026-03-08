@@ -3,6 +3,11 @@ site_description: Lightweight Modbus RTU Sniffer with GUI
 site_url: https://niwciu.github.io/ModbusSniffer/
 repo_url: https://github.com/niwciu/ModbusSniffer
 
+nav:
+  - Home: index.md
+  - Installation: installation.md
+  - Contributing: CONTRIBUTING.md
+
 theme:
   name: material
   language: en
@@ -45,6 +50,8 @@ markdown_extensions:
   - pymdownx.tabbed:
       alternate_style: true
   - pymdownx.snippets
+  - pymdownx.tasklist:
+      custom_checkbox: true
   - pymdownx.tasklist:
       custom_checkbox: true
 

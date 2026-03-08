@@ -47,7 +47,7 @@
 
 Download binary files for Ubuntu and Windows from [GitHub Releases](https://github.com/niwciu/ModbusSniffer/releases).
 
-You can also install directly from pip or build and install the app from sources. [Click here](CONTRIBUTING.md#build--install) for details.
+You can also install directly from pip or build and install the app from sources. [Click here](installation.md) for details.
 
 ---
 
@@ -104,11 +104,11 @@ Not yet. Support for custom function code decoding is planned for a future relea
 The easiest way is to download the pre-built binaries from the [releases page](https://github.com/niwciu/ModbusSniffer/releases) run the app.  
 You can also install it via PyPI.
 Alternatively, You can clone the repository and run the script manually or run build&install script inside the repo.  
-For quick guide look at [▶️ Usage](#️-usage) section.  
-For more information albut build & install can be found [here](CONTRIBUTING.md#️-build--install)
+For quick guide look at [Usage](#usage) section.  
+For more information albut build & install can be found [here](installation.md)
 
 **Q: Is there an installer that adds ModbusSniffer to system programs with shortcuts and icons?**  
-No, there is no official installer package. However, by following the instructions in the CONTRIBUTING.md file under the Build & Install section, you can clone the repository and run the build script. This script compiles the application from source, creates binaries, and adds shortcuts to the system pointing to the built binaries.
+No, there is no official installer package. However, by following the instructions in the Installation guide, you can clone the repository and run the build script. This script compiles the application from source, creates binaries, and adds shortcuts to the system pointing to the built binaries.
 
 > ⚠️ Important: The build script generates binaries inside the project folder and creates shortcuts referencing those binaries. It does not modify system files. Therefore, do not delete the binary folder after installation, or shortcuts will stop working.  
 

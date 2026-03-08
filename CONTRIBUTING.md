@@ -44,11 +44,30 @@ See the full [CHANGELOG.md](https://github.com/niwciu/ModbusSniffer/blob/main/CH
   - Add frame filtering
 - Add posibility to set log files path 
 
+## 🗺️ Roadmap
+- Support for Modbus TCP
+- Custom function code decoding
+- Advanced filtering and analysis tools
+- Plugin system for extensions
 
 ## 📚 Documentation & Support
 
 - Detailed documentation will be available in the `docs/` folder soon.
 - Questions or issues? Open an [issue](https://github.com/niwciu/ModbusSniffer/issues) or join the [Discussions](https://github.com/niwciu/ModbusSniffer/discussions).
+
+## 🧪 Testing
+
+Run tests with pytest:
+
+```bash
+pip install -e .[dev]
+pytest
+```
+
+Coverage report:
+```bash
+pytest --cov=modbus_sniffer
+```
 
 ---
 
@@ -71,7 +90,14 @@ This includes formatters, linters, type checkers, test runners, and build tools.
 
 ---
 
-## 📜 License
+## � Acknowledgments
+
+Thanks to the original author [BADAndrea](https://github.com/BADAndrea) for the initial ModbusSniffer implementation.  
+Special thanks to all contributors and the open-source community for feedback and improvements.
+
+---
+
+## �📜 License
 
 This project is licensed under the MIT License — see the [LICENSE](https://github.com/niwciu/ModbusSniffer/blob/main/LICENSE) file.
 

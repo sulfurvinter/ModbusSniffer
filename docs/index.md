@@ -8,7 +8,7 @@
     <td style="vertical-align: top; font-size: 0.9rem; font-family: system-ui, sans-serif; position: relative;">
       <div style="margin-bottom: 1.5em;">
         <strong>ModbusSniffer</strong> is a lightweight, cross-platform desktop application for monitoring Modbus RTU communication via serial ports in real-time.<br><br>
-        Designed for engineers, technicians, and automation developers, it simplifies troubleshooting by capturing showing decoded Modbus traffic in real-time.
+        Designed for engineers, technicians, and automation developers, it simplifies troubleshooting by capturing and showing decoded Modbus traffic in real-time.
       </div>
       <div style="text-align: right;">
         <a href="https://github.com/niwciu/ModbusSniffer/releases">
@@ -42,7 +42,16 @@
 
 ---
 
-## 📦 Download & Installation
+## � Screenshots
+
+<div align="center">
+  <img src="./img/gui-screenshot.png" alt="GUI Screenshot" width="600" />
+  <p><em>Main GUI interface showing live frame capture</em></p>
+</div>
+
+---
+
+## �📦 Download & Installation
 
 
 Download binary files for Ubuntu and Windows from [GitHub Releases](https://github.com/niwciu/ModbusSniffer/releases).
@@ -89,6 +98,28 @@ Depending on the selected mode and view:
 
 ---
 
+## 🏗️ Architecture
+
+ModbusSniffer is built with a modular architecture for clarity and maintainability. The core components are:
+
+```mermaid
+graph TD
+    A[GUI / CLI] --> B[Main Logger]
+    B --> C[Serial Snooper]
+    C --> D[Modbus Parser]
+    D --> E[CSV Logger]
+    B --> F[Sniffer Utils]
+```
+
+- **GUI/CLI**: User interfaces for starting/stopping sniffing and displaying results.
+- **Main Logger**: Coordinates logging and data flow.
+- **Serial Snooper**: Handles serial port communication and raw data capture.
+- **Modbus Parser**: Decodes Modbus RTU frames into readable format.
+- **CSV Logger**: Exports data to CSV for analysis.
+- **Sniffer Utils**: Utility functions for data processing.
+
+---
+
 ## ❓ FAQ
 
 **Q: Can I use ModbusSniffer with USB-to-RS485 converters?**  
@@ -110,7 +141,16 @@ For more information albut build & install can be found [here](installation.md)
 **Q: Is there an installer that adds ModbusSniffer to system programs with shortcuts and icons?**  
 No, there is no official installer package. However, by following the instructions in the Installation guide, you can clone the repository and run the build script. This script compiles the application from source, creates binaries, and adds shortcuts to the system pointing to the built binaries.
 
-> ⚠️ Important: The build script generates binaries inside the project folder and creates shortcuts referencing those binaries. It does not modify system files. Therefore, do not delete the binary folder after installation, or shortcuts will stop working.  
+> ⚠️ Important: The build script generates binaries inside the project folder and creates shortcuts referencing those binaries. It does not modify system files. Therefore, do not delete the binary folder after installation, or shortcuts will stop working.
+
+**Q: What if I encounter errors during installation or usage?**  
+Check the [troubleshooting guide](installation.md#troubleshooting) or open an issue on GitHub with details about your setup and error messages.
+
+**Q: Can ModbusSniffer handle high-speed Modbus communication?**  
+Yes, it supports baud rates up to 115200 and higher, depending on your hardware. For very high speeds, ensure your serial adapter is capable.
+
+**Q: Is there a way to automate sniffing with scripts?**  
+Yes, use the CLI mode in scripts or integrate with Python code via the API.
 
 ---
 
@@ -159,6 +199,21 @@ For more usage examples, development guide, and instructions for building from s
 
 👉 [ModbusSniffer on GitHub](https://github.com/niwciu/ModbusSniffer)  
 👉 [CONTRIBUTING.md](CONTRIBUTING.md)
+
+## 📋 Examples
+
+### Basic Sniffing
+Start GUI, select serial port (e.g., COM3 or /dev/ttyUSB0), set baud rate to 9600, and click "Start". View live frames in the table.
+
+### CLI with Logging
+```bash
+modbus-sniffer -p /dev/ttyUSB0 -b 115200 -r none --log-file output.csv
+```
+
+### Debugging PLC Communication
+Use table view to filter by device ID 1, monitor read holding registers (function 3) for troubleshooting.
+
+---
 
 ## 🤝 Contributing
 

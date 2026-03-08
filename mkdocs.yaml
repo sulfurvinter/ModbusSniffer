@@ -6,6 +6,7 @@ repo_url: https://github.com/niwciu/ModbusSniffer
 nav:
   - Home: index.md
   - Installation: installation.md
+  - API Reference: api.md
   - Contributing: CONTRIBUTING.md
 
 theme:
@@ -42,7 +43,11 @@ markdown_extensions:
   - toc:
       permalink: true
   - tables
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.highlight
   - pymdownx.inlinehilite
   - pymdownx.emoji:
@@ -52,11 +57,6 @@ markdown_extensions:
   - pymdownx.snippets
   - pymdownx.tasklist:
       custom_checkbox: true
-  - pymdownx.tasklist:
-      custom_checkbox: true
-
-nav:
-  - Home: index.md
 
 extra:
   social:

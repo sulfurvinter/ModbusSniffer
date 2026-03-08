@@ -239,3 +239,19 @@ python cli.py -p /dev/ttyUSB0 -b 115200 -r none
 ```bash
 deactivate
 ```
+
+## 🔧 Troubleshooting
+
+**Issue: Serial port not found**  
+Ensure the port is correct (e.g., `/dev/ttyUSB0` on Linux, `COM3` on Windows). Check with `ls /dev/tty*` or Device Manager.
+
+**Issue: Permission denied on Linux**  
+Add user to dialout group: `sudo usermod -a -G dialout $USER`, then reboot.
+
+**Issue: PyQt6 not installing**  
+Install system dependencies: `sudo apt install python3-pyqt6` on Ubuntu.
+
+**Issue: Build fails**  
+Ensure Python 3.8+ and all dependencies. Clean build with `rm -rf build dist *.spec`.
+
+For more help, check [GitHub Issues](https://github.com/niwciu/ModbusSniffer/issues).

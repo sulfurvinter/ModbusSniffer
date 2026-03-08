@@ -5,7 +5,10 @@ A lightweight and user-friendly Modbus RTU sniffer tool with a graphical interfa
 Easily analyze and debug communication between PLCs, HMIs, and other Modbus RTU devices via serial ports.
 
 [![GitHub release](https://img.shields.io/github/v/release/niwciu/ModbusSniffer)](https://github.com/niwciu/ModbusSniffer/releases)
+[![PyPI version](https://img.shields.io/pypi/v/modbus-sniffer)](https://pypi.org/project/modbus-sniffer/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/niwciu/ModbusSniffer)](https://github.com/niwciu/ModbusSniffer/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues/niwciu/ModbusSniffer)](https://github.com/niwciu/ModbusSniffer/issues)
 
 <div align="center">
 <img src="https://niwciu.github.io/ModbusSniffer/gui.gif" alt="Demo" />

@@ -197,7 +197,7 @@ class GUIApp(QWidget):
 
         self.baudrate_label = QLabel("Baudrate:")
         self.baudrate_input = QComboBox()
-        self.baudrate_input.addItems(["9600", "19200", "38400", "57600", "115200"])
+        self.baudrate_input.addItems(["9600", "19200", "38400", "57600", "115200", "230400", "460800", "921600"])
         self.settings_layout.addWidget(
             self.baudrate_label, alignment=Qt.AlignmentFlag.AlignRight
         )

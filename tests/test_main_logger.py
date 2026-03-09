@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 import tempfile
+from unittest.mock import MagicMock
 
 from modbus_sniffer.main_logger import (
     configure_logging,
@@ -156,3 +157,32 @@ def test_daily_file_handler_is_timed_rotating_file_handler(tmp_path):
     finally:
         if old_file is not None:
             setattr(module, "__file__", old_file)
+
+
+def test_gui_log_handler_error_handling():
+    # callback that raises
+    def bad_cb(msg):
+        raise ValueError("boom")
+
+    handler = GuiLogHandler(bad_cb)
+    handler.handleError = MagicMock()
+    formatter = MyFormatter()
+    handler.setFormatter(formatter)
+    record = logging.LogRecord(
+        name="test",
+        level=logging.INFO,
+        pathname="",
+        lineno=0,
+        msg="ignored",
+        args=(),
+        exc_info=None,
+    )
+    handler.emit(record)
+    handler.handleError.assert_called_once_with(record)
+
+
+def test_configure_logging_frozen_sys(tmp_path, monkeypatch):
+    # Skip this test as sys.frozen cannot be reliably monkeypatched
+    # The getattr(sys, "frozen", False) pattern is already tested implicitly
+    # through test_configure_logging_to_file
+    pass

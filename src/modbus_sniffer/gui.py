@@ -548,10 +548,10 @@ class GUIApp(QWidget):
                 "occurrences": 1,
                 "exception_code": frame["exception_code"],
                 # FC 23 additional fields
-                "read_address": frame["read_address"],
-                "read_quantity": frame["read_quantity"],
-                "write_address": frame["write_address"],
-                "write_quantity": frame["write_quantity"],
+                "read_address": frame.get("read_address", ""),
+                "read_quantity": frame.get("read_quantity", ""),
+                "write_address": frame.get("write_address", ""),
+                "write_quantity": frame.get("write_quantity", ""),
             }
 
         self.update_parsed_data_table()

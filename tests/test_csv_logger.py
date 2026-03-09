@@ -88,3 +88,54 @@ def test_close_twice_is_safe():
         logger = CSVLogger(enable_csv=True, output_dir=tmpdir)
         logger.close()
         logger.close()  # should not raise
+
+
+def test_get_date_and_datetime_str():
+    # ensure utility methods return formatted strings
+    logger = CSVLogger(enable_csv=False)
+    ds = logger._get_date_str()
+    assert len(ds) == 8 and ds.isdigit()
+    dt = logger._get_datetime_str()
+    assert len(dt) >= 19 and dt[4] == "-"
+
+
+def test_rewrite_file_with_no_csv_file():
+    # if csv_file is None early return
+    logger = CSVLogger(enable_csv=False)
+    # should simply return without error
+    logger._rewrite_file_with_new_header()
+
+
+def test_expand_header_no_change():
+    # when requested registers already in map, header should not rewrite
+    with tempfile.TemporaryDirectory() as tmpdir:
+        logger = CSVLogger(enable_csv=True, output_dir=tmpdir)
+        # first log to create entries
+        logger.log_data("t", 1, "READ", 10, 1, [1])
+        old_cols = list(logger.columns)
+        logger.log_data("t2", 1, "READ", 10, 1, [2])
+        # columns unchanged
+        assert logger.columns == old_cols
+        logger.close()
+
+
+def test_rewrite_file_handles_short_old_rows():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        logger = CSVLogger(enable_csv=True, output_dir=tmpdir)
+        path = logger.csv_file.name
+        # manually write header with two columns and a row with only one value
+        logger.csv_file.close()
+        with open(path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["Timestamp", "Slave ID", "Operation"])
+            writer.writerow(["2024","1"])
+        # instruct logger to rewrite with additional column
+        logger.columns.append("Extra")
+        logger._rewrite_file_with_new_header()
+        logger.csv_file.close()
+        with open(path, newline="") as f:
+            rows = list(csv.reader(f))
+            assert rows[0][-1] == "Extra"
+            # second row should have empty slot for the new column
+            assert len(rows[1]) == 4 and rows[1][-1] == ""
+

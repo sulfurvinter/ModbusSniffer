@@ -1,5 +1,26 @@
 # Changelog
 
+# v1.0.4 – What’s Changed 🚀
+
+## 🚀 Feature Enhancements
+- 📶 Extended baudrate options in GUI combo box to include 230400, 460800, and 921600
+
+## 📚 Documentation Updates
+- 📝 Improved Polish documentation pages with standardized emojis and added UI section
+- 🖼️ Added application screenshots and fixed main icon references
+- 🔄 Reorganized and fixed Polish index page structure
+- 📖 General documentation improvements and updates
+
+## 🧪 Test Suite Fixes
+- 🐛 Fixed AttributeError in ModbusParser by initializing `bufferIndex` in `__init__`
+- 🔧 Updated GUI tests to use correct imports (QStyleOptionViewItem from QtWidgets)
+- 🛠️ Added proper mocking for serial.Serial in tests to prevent real hardware access
+- ✅ Fixed assertions in parser tests and GUI add_parsed_data method to use safe dict access
+- ⚙️ Configured pytest for source coverage instead of installed package
+
+**Full Changelog**: https://github.com/niwciu/ModbusSniffer/compare/v1.0.3...v1.0.4
+
+
 # v1.0.3 – What’s Changed 🚀
 
 ## ⚙️ CI/CD Improvements

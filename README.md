@@ -6,6 +6,8 @@ Easily analyze and debug communication between PLCs, HMIs, and other Modbus RTU 
 
 [![GitHub release](https://img.shields.io/github/v/release/niwciu/ModbusSniffer)](https://github.com/niwciu/ModbusSniffer/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/niwciu/ModbusSniffer)](https://github.com/niwciu/ModbusSniffer/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues/niwciu/ModbusSniffer)](https://github.com/niwciu/ModbusSniffer/issues)
 
 <div align="center">
 <img src="https://niwciu.github.io/ModbusSniffer/gui.gif" alt="Demo" />
@@ -33,7 +35,7 @@ pip install modbus-sniffer
 ```
 or download Binary files for Ubuntu and Windows from [here](https://github.com/niwciu/ModbusSniffer/releases).
 
-You can also build and install app from sourcess. [Click here](CONTRIBUTING.md#%EF%B8%8F-build--install) for deatails about it.
+You can also build and install app from sourcess. [Click here](docs/installation.md) for deatails about it.
 
 
 ---
@@ -65,7 +67,7 @@ For more usage options, development guide, and installation from source, visit t
 ---
 ## 🤝 Contributing
 
-Please see [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and contribution guidelines.
+Please see [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for development setup and contribution guidelines.
 
 ---
 

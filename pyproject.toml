@@ -54,5 +54,6 @@ extend-ignore = ["E203", "W503"]
 exclude = [".venv", "build", "dist", "__pycache__"]
 
 [tool.pytest.ini_options]
+pythonpath = ["src"]
 addopts = "--cov=src --cov-report=term-missing"
 testpaths = ["tests"]

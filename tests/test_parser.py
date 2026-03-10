@@ -273,3 +273,99 @@ def test_read_write_multiple_registers_request_and_response(setup_parser):
     assert resp_frame["function"] == 23
     assert resp_frame["message_type"] == "response"
     assert resp_frame["data"] == [1, 2]
+
+
+def test_is_response_frame_and_validation_helpers(setup_parser):
+    parser, log, csv, on_parsed = setup_parser
+    # buffer too short
+    assert not parser._validate_crc(b"", 0)
+    # valid CRC for simple data
+    data = bytes([0x01, 0x03, 0x00])
+    crc = parser.calcCRC16(data, len(data))
+    assert isinstance(crc, int)
+    # zero-length should return 0xFFFF
+    assert parser.calcCRC16(b"", 0) == 0xFFFF
+    # test _parse_data_words
+    words = parser._parse_data_words(b"\x00\x01\x00\x02")
+    assert words == [1, 2]
+
+    # _common_frame merges kwargs
+    frm = parser._common_frame(custom="value")
+    assert frm["custom"] == "value"
+
+    # _is_response_frame with different fcs
+    buf = bytearray([1,2,3,4,5,6,7,8,9])
+    assert parser._is_response_frame(buf, 1, 0)
+    assert parser._is_response_frame(buf, 5, 0)
+    # index error case
+    assert not parser._is_response_frame(bytearray(), 1, 0)
+
+
+def test_handlers_early_return_and_list_branches(setup_parser):
+    parser, log, csv, on_parsed = setup_parser
+    # Initialize bufferIndex before calling handlers
+    parser.bufferIndex = 0
+    # short buffers
+    assert parser._handle_read_bits(b"", 0, 1, 1) is None
+    assert parser._handle_read_registers(b"", 0, 1, 3) is None
+    assert parser._handle_write_single(b"", 0, 1, 5) is None
+    assert parser._handle_write_multiple(b"", 0, 1, 15) is None
+    assert parser._handle_read_write(b"", 0, 1, 23) is None
+    assert parser._handle_exception(b"", 0, 1, 0x80) is None
+    assert parser._handle_read_bits_response(b"", 0, 1, 1) is None
+    assert parser._handle_read_registers_response(b"", 0, 1, 3) is None
+    assert parser._handle_write_single_response(b"", 0, 1, 5) is None
+    assert parser._handle_write_multiple_response(b"", 0, 1, 15) is None
+    assert parser._handle_read_write_response(b"", 0, 1, 23) is None
+
+    # invalid CRC case for one handler
+    bad = bytearray([1,1,0,0,0,0,0,0])
+    assert parser._handle_read_bits(bad, 0, 1, 1) is None
+
+    # response without pending request
+    parser.pendingRequests.clear()
+    # build read_registers response with byte count 2 and two bytes of data
+    resp = bytearray([1,3,2,0,1])
+    resp = build_frame(resp)
+    # handler can return None if no pending request exists
+    out = parser._handle_read_registers_response(resp, 0, 1, 3)
+
+
+def test_read_bits_and_write_multiple_variants(setup_parser):
+    parser, log, csv, on_parsed = setup_parser
+    # read bits request for coils and discrete inputs
+    req = bytes([1,1,0,1,0,2])
+    req = build_frame(req)
+    parser.decodeModbus(req)
+    req2 = bytes([1,2,0,1,0,2])
+    req2 = build_frame(req2)
+    parser.decodeModbus(req2)
+    # response for read bits coils
+    resp = bytes([1,1,2,0xAA])
+    resp = build_frame(resp)
+    parser.decodeModbus(resp)
+    # write multiple coils and registers
+    # for simplicity only test that they return frames via direct call
+    buf_coils = bytearray([1,15,0,1,0,2,2,0x01,0x02,0,0])
+    buf_coils = build_frame(buf_coils[:-2])
+    parser.decodeModbus(buf_coils)
+    buf_regs = bytearray([1,16,0,1,0,2,4,0,1,0,2,0,0])
+    buf_regs = build_frame(buf_regs[:-2])
+    parser.decodeModbus(buf_regs)
+
+
+def test_positive_response_handlers(setup_parser):
+    parser, log, csv, on_parsed = setup_parser
+    # Initialize bufferIndex before calling handlers
+    parser.bufferIndex = 0
+    # write multiple response fc15 - test that handler doesn't crash
+    buf = bytearray([1,15,0,1,0,2])
+    buf = build_frame(buf)
+    # handler might return None if there's no pending request
+    res = parser._handle_write_multiple_response(buf, 0, 1, 15)
+    # read/write response fc23 with two bytes
+    buf2 = bytearray([1,23,2,0x00,0x01])
+    buf2 = build_frame(buf2)
+    # handler might return None if there's no pending request
+    res2 = parser._handle_read_write_response(buf2, 0, 1, 23)
+

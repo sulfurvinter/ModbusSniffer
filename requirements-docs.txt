@@ -1,0 +1,4 @@
+mkdocs-material
+mkdocs-static-i18n
+mkdocs-minify-plugin
+mkdocs-git-revision-date-localized-plugin

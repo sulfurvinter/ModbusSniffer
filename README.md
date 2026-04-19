@@ -21,6 +21,8 @@ Easily analyze and debug communication between PLCs, HMIs, and other Modbus RTU 
 - 🖥️ GUI interface built with PyQt6
 - 📋 Frame table: Real-time decoded Modbus traffic
 - 🌈 Color-coded logging of request–response frames
+- 📁 Custom log file path — pick your own log file via a file chooser dialog
+- 💾 Save log buffer to file at any time with a single button click
 - 🪟 Cross-platform: Windows & Linux
 - 🆓 MIT licensed, open-source
 
@@ -63,6 +65,15 @@ modbus-sniffer -p /dev/ttyUSB0 -b 115200 -r none
 For more usage options, development guide, and installation from source, visit the GitHub repository:
 
 👉 [ModbusSniffer on GitHub](https://github.com/niwciu/ModbusSniffer)
+
+---
+
+## 📂 Log File Control
+
+The GUI provides two log file controls in the Settings area:
+
+- **Log File** field — shows the current log file path. Click **Browse…** to open a file chooser and select where the log file will be written. If left as `(auto-generated)`, a timestamped file is created automatically in the `logs/` folder on each session start.
+- **Save Buffer to File** button — opens a file chooser and saves the entire current log view to the chosen file, independent of the live logging setting.
 
 ---
 ## 🤝 Contributing

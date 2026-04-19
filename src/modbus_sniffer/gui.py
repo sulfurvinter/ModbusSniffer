@@ -1,3 +1,5 @@
+# Modified 2026-04-19 by Claude: added log file path display + Browse button,
+# and a "Save Buffer to File" button with file chooser dialog.
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtWidgets import (
     QApplication,
@@ -16,6 +18,8 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem,
     QStyledItemDelegate,
     QHeaderView,
+    QFileDialog,
+    QMessageBox,
 )
 from PyQt6.QtGui import QFontMetrics
 from PyQt6.QtSerialPort import QSerialPortInfo
@@ -80,6 +84,7 @@ class SnifferWorker(QThread):
         raw_only,
         daily_file,
         log_to_file,
+        log_file_path=None,
     ):
         super().__init__()
         self.port = port
@@ -96,6 +101,7 @@ class SnifferWorker(QThread):
             log_to_file=self.log_to_file,
             daily_file=daily_file,
             gui_callback=self.emit_log,
+            log_file_path=log_file_path,
         )
 
     def emit_log(self, msg):
@@ -147,6 +153,7 @@ class GUIApp(QWidget):
 
         self.layout = QVBoxLayout()
         self.top_layout = QHBoxLayout()
+        self.log_file_path = None  # None = auto-generate timestamped name
 
         # ---------- Grid layout for settings ----------
         # Grupa łącząca oba layouty
@@ -265,10 +272,25 @@ class GUIApp(QWidget):
             self.daily_file_checkbox, alignment=Qt.AlignmentFlag.AlignLeft
         )
 
+        # ------- log_file_layout: file name display + Browse button -------
+        self.log_file_layout = QHBoxLayout()
+        self.log_file_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+
+        self.log_file_label = QLabel("Log File:")
+        self.log_file_display = QLineEdit("(auto-generated)")
+        self.log_file_display.setReadOnly(True)
+        self.log_file_display.setMinimumWidth(350)
+        self.log_file_browse_btn = QPushButton("Browse…")
+
+        self.log_file_layout.addWidget(self.log_file_label)
+        self.log_file_layout.addWidget(self.log_file_display)
+        self.log_file_layout.addWidget(self.log_file_browse_btn)
+
         # ------- Add all layouts to group -------
         main_settings_layout.addLayout(self.settings_layout)
         main_settings_layout.addLayout(self.timeout_layout)
         main_settings_layout.addLayout(self.options_layout)
+        main_settings_layout.addLayout(self.log_file_layout)
         self.port_settings_grup.setLayout(main_settings_layout)
 
         # Dodaj grupę do głównego layoutu aplikacji
@@ -279,10 +301,12 @@ class GUIApp(QWidget):
         self.start_btn = QPushButton("Start")
         self.stop_btn = QPushButton("Stop")
         self.clear_btn = QPushButton("Clear View")
+        self.save_buffer_btn = QPushButton("Save Buffer to File")
         self.stop_btn.setEnabled(False)
         self.button_layout.addWidget(self.start_btn)
         self.button_layout.addWidget(self.stop_btn)
         self.button_layout.addWidget(self.clear_btn)
+        self.button_layout.addWidget(self.save_buffer_btn)
         self.layout.addLayout(self.button_layout)
 
         # ---------- Tabs ----------
@@ -365,6 +389,8 @@ class GUIApp(QWidget):
         self.start_btn.clicked.connect(self.start_sniffer)
         self.stop_btn.clicked.connect(self.stop_sniffer)
         self.clear_btn.clicked.connect(self.clear_sniffer_view)
+        self.log_file_browse_btn.clicked.connect(self.browse_log_file)
+        self.save_buffer_btn.clicked.connect(self.save_buffer_to_file)
 
     def start_sniffer(self):
         port = self.port_input.currentText()
@@ -396,13 +422,40 @@ class GUIApp(QWidget):
             f"{config['port']}, {config['baudrate']}, {parity_str}, Timeout: {config['timeout']}</span>"
         )
 
-        self.sniffer_thread = SnifferWorker(**config)
+        self.sniffer_thread = SnifferWorker(**config, log_file_path=self.log_file_path)
         self.sniffer_thread.log_signal.connect(self.update_log_window)
         self.sniffer_thread.parsed_data_signal.connect(self.update_parsed_data)
         self.sniffer_thread.start()
 
         self.start_btn.setEnabled(False)
         self.stop_btn.setEnabled(True)
+
+    def browse_log_file(self):
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Select Log File",
+            self.log_file_path or "",
+            "Log Files (*.log);;Text Files (*.txt);;All Files (*)",
+        )
+        if path:
+            self.log_file_path = path
+            self.log_file_display.setText(path)
+
+    def save_buffer_to_file(self):
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Buffer to File",
+            "",
+            "Log Files (*.log);;Text Files (*.txt);;All Files (*)",
+        )
+        if not path:
+            return
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(self.log_window.toPlainText())
+            QMessageBox.information(self, "Saved", f"Buffer saved to:\n{path}")
+        except OSError as e:
+            QMessageBox.critical(self, "Error", f"Could not save file:\n{e}")
 
     def stop_sniffer(self):
         if self.sniffer_thread:

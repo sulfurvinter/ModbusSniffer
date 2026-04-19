@@ -1,3 +1,5 @@
+# Modified 2026-04-19 by Claude: added log_file_path parameter to configure_logging()
+# to support user-selected log file paths from the GUI file chooser.
 import os
 import sys
 import logging
@@ -40,7 +42,8 @@ class GuiLogHandler(logging.Handler):
 
 
 def configure_logging(
-    log_to_file=True, daily_file=False, gui_callback=None, output_dir="logs"
+    log_to_file=True, daily_file=False, gui_callback=None, output_dir="logs",
+    log_file_path=None,
 ):
     log = logging.getLogger("global_logger")
     log.setLevel(logging.INFO)
@@ -63,20 +66,22 @@ def configure_logging(
 
     # Log to file
     if log_to_file:
-        # Determine base directory of the actual app location (not symlink)
-        if getattr(sys, "frozen", False):
-            base_dir = os.path.dirname(sys.executable)
+        if log_file_path:
+            # Use the explicitly provided path from the GUI file chooser
+            logs_dir = os.path.dirname(log_file_path)
+            if logs_dir:
+                os.makedirs(logs_dir, exist_ok=True)
         else:
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-
-        # Combine with output_dir
-        logs_dir = os.path.join(base_dir, output_dir)
-        os.makedirs(logs_dir, exist_ok=True)
-
-        # Log file name
-        current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        filename = f"log_{current_time}.log"
-        log_file_path = os.path.join(logs_dir, filename)
+            # Auto-generate a timestamped path
+            if getattr(sys, "frozen", False):
+                base_dir = os.path.dirname(sys.executable)
+            else:
+                base_dir = os.path.dirname(os.path.abspath(__file__))
+            logs_dir = os.path.join(base_dir, output_dir)
+            os.makedirs(logs_dir, exist_ok=True)
+            current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            filename = f"log_{current_time}.log"
+            log_file_path = os.path.join(logs_dir, filename)
 
         if daily_file:
             handler = TimedRotatingFileHandler(

@@ -65,15 +65,13 @@ def test_process_data_accumulates_and_decodes(monkeypatch):
             csv_log=False,
             daily_file=False,
         )
-        # patch ModbusParser to record calls
+        # Replace the already-created parser instance directly
         called = {}
         class FakeParser:
-            def __init__(self, log, csv, raw_log, trashdata, on_parsed=None):
-                called['init'] = True
             def decodeModbus(self, data):
                 called['decode'] = True
                 return b''
-        monkeypatch.setattr('modbus_sniffer.serial_snooper.ModbusParser', FakeParser)
+        snooper.parser = FakeParser()
         snooper.data = bytearray(b"123")
         snooper.process_data(b"")  # triggers check for len(self.data)>2
         assert called.get('decode')

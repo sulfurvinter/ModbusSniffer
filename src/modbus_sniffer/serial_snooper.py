@@ -1,3 +1,5 @@
+# Modified 2026-04-26 by Claude: persist ModbusParser across inter-frame gaps so
+# pendingRequests survives between request and response frames.
 import serial
 from modbus_sniffer.modbus_parser_new import ModbusParser
 from modbus_sniffer.csv_logger import CSVLogger
@@ -62,6 +64,15 @@ class SerialSnooper:
         self.trashdata = False
         self.trashdataf = bytearray(0)
 
+        # Parser is persistent so pendingRequests survives across inter-frame gaps
+        self.parser = ModbusParser(
+            self.log,
+            self.csv_logger,
+            self.raw_log,
+            self.trashdata,
+            on_parsed=self.emit_parsed_data,
+        )
+
     def __enter__(self):
         return self
 
@@ -98,14 +109,7 @@ class SerialSnooper:
         if len(data) <= 0:
             # Check if we have something that might form a valid modbus frame
             if len(self.data) > 2:
-                modbus_parser = ModbusParser(
-                    self.log,
-                    self.csv_logger,
-                    self.raw_log,
-                    self.trashdata,
-                    on_parsed=self.emit_parsed_data,
-                )
-                self.data = modbus_parser.decodeModbus(self.data)
+                self.data = self.parser.decodeModbus(self.data)
             return
 
         # Otherwise, accumulate and decode as normal

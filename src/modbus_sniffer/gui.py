@@ -1,5 +1,8 @@
 # Modified 2026-04-19 by Claude: added log file path display + Browse button,
 # and a "Save Buffer to File" button with file chooser dialog.
+# Modified 2026-04-25 by Claude: merge slave response data into the matching request row
+# so the Data column is populated for FC3/4 reads with large quantities.
+# Modified 2026-04-26 by Claude: pin Data column (8) to fixed interactive width to stop flicker.
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtWidgets import (
     QApplication,
@@ -21,7 +24,7 @@ from PyQt6.QtWidgets import (
     QFileDialog,
     QMessageBox,
 )
-from PyQt6.QtGui import QFontMetrics
+from PyQt6.QtGui import QFontMetrics, QColor
 from PyQt6.QtSerialPort import QSerialPortInfo
 import sys
 import platform
@@ -33,22 +36,33 @@ from modbus_sniffer.main_logger import configure_logging
 class AutoResizeTable(QTableWidget):
     def __init__(self):
         super().__init__()
+        self._pinned_columns: set[int] = set()
         self.setup_table()
 
     def setup_table(self):
         self.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.ResizeToContents
         )
+        # Fixed row height — prevents rows from jumping when cell content changes
         self.verticalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.ResizeToContents
+            QHeaderView.ResizeMode.Fixed
         )
-
-        # Resize the column after addind data to table
+        self.verticalHeader().setDefaultSectionSize(22)
         self.model().dataChanged.connect(self.resize_columns)
 
+    def pin_column_width(self, col: int, width: int):
+        """Fix a column to a stable user-resizable width, excluded from auto-resize."""
+        self._pinned_columns.add(col)
+        self.horizontalHeader().setSectionResizeMode(
+            col, QHeaderView.ResizeMode.Interactive
+        )
+        self.setColumnWidth(col, width)
+
     def resize_columns(self):
-        self.resizeColumnsToContents()
-        self.resizeRowsToContents()
+        for i in range(self.columnCount()):
+            if i not in self._pinned_columns:
+                self.resizeColumnToContents(i)
+        # No resizeRowsToContents — row height is fixed to stop vertical jumping
 
 
 class AdvancedAlignDelegate(QStyledItemDelegate):
@@ -145,6 +159,7 @@ class GUIApp(QWidget):
 
         self.last_master = None
         self.last_ok_color = "blue"
+        self.addr_hex = True  # True = hex, False = decimal
 
         self.pastel_green = "#22F583"
         self.pastel_blue = "#227EF5"
@@ -324,9 +339,18 @@ class GUIApp(QWidget):
         self.tab1_layout.addWidget(self.log_window)
         self.tab1.setLayout(self.tab1_layout)
 
-        # Tab 2
-        self.table = QTableWidget()
-        self.table.setColumnCount(10)
+        # Tab 2 — controls row (hex/dec toggle)
+        self.tab2_controls_layout = QHBoxLayout()
+        self.addr_hex_checkbox = QCheckBox("Hex Addresses")
+        self.addr_hex_checkbox.setChecked(True)
+        self.tab2_controls_layout.addWidget(self.addr_hex_checkbox)
+        self.tab2_controls_layout.addStretch()
+        self.tab2_layout = QVBoxLayout()
+        self.tab2_layout.addLayout(self.tab2_controls_layout)
+
+        # Tab 2 — table
+        self.table = AutoResizeTable()
+        self.table.setColumnCount(11)
         self.table.setHorizontalHeaderLabels(
             [
                 "Timestamp",
@@ -339,6 +363,7 @@ class GUIApp(QWidget):
                 "Byte Count",
                 "Data",
                 "Occurrences",
+                "Status",
             ]
         )
 
@@ -365,6 +390,7 @@ class GUIApp(QWidget):
         delegate.set_column_alignment(
             9, Qt.AlignmentFlag.AlignHCenter, Qt.AlignmentFlag.AlignVCenter
         )
+        delegate.set_column_alignment(10, Qt.AlignmentFlag.AlignLeft)
         self.table.setItemDelegate(delegate)
 
         header = self.table.horizontalHeader()
@@ -373,9 +399,11 @@ class GUIApp(QWidget):
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(9, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(10, QHeaderView.ResizeMode.ResizeToContents)
         self.table.resizeColumnsToContents()
+        # Pin Data column (8) AFTER initial resize so it isn't overridden back to header width
+        self.table.pin_column_width(8, 220)
 
-        self.tab2_layout = QVBoxLayout()
         self.tab2_layout.addWidget(self.table)
         self.tab2.setLayout(self.tab2_layout)
 
@@ -391,6 +419,7 @@ class GUIApp(QWidget):
         self.clear_btn.clicked.connect(self.clear_sniffer_view)
         self.log_file_browse_btn.clicked.connect(self.browse_log_file)
         self.save_buffer_btn.clicked.connect(self.save_buffer_to_file)
+        self.addr_hex_checkbox.stateChanged.connect(self.on_addr_hex_changed)
 
     def start_sniffer(self):
         port = self.port_input.currentText()
@@ -481,7 +510,9 @@ class GUIApp(QWidget):
         Update logs in log wiev window.
         Add coloring of the logs
         """
-        if "Master" in log_entry:
+        if "⚠" in log_entry:
+            log_entry = f"<span style='color:{self.pastel_orange}'>{log_entry}</span>"
+        elif "Master" in log_entry:
             if self.last_master == "no response":
                 log_entry = f"<span style='color:{self.pastel_red}'>{log_entry}</span>"
             else:
@@ -501,7 +532,7 @@ class GUIApp(QWidget):
             # add separation after slave log
             log_entry += "<br>"
 
-        # Add log to gui log wiev tab
+        # Add log to gui log view tab
         self.log_window.append(log_entry)
 
     def update_parsed_data(self, data):
@@ -514,6 +545,10 @@ class GUIApp(QWidget):
             self.log_window.append(
                 f"[WARN] Unexpected data type: {type(data)} - {data}"
             )
+
+    def on_addr_hex_changed(self):
+        self.addr_hex = self.addr_hex_checkbox.isChecked()
+        self.update_parsed_data_table()
 
     def format_table_fields(self, value):
         """
@@ -529,7 +564,10 @@ class GUIApp(QWidget):
                 write_addr = int(value["write_address"])
                 read_qty = int(value["read_quantity"])
                 write_qty = int(value["write_quantity"])
-                formatted_address = f"R: 0x{read_addr:04X} W: 0x{write_addr:04X}"
+                if self.addr_hex:
+                    formatted_address = f"R: 0x{read_addr:04X} W: 0x{write_addr:04X}"
+                else:
+                    formatted_address = f"R: {read_addr} W: {write_addr}"
                 formatted_quantity = f"R: {read_qty} W: {write_qty}"
             except (ValueError, TypeError):
                 formatted_address = (
@@ -543,7 +581,10 @@ class GUIApp(QWidget):
             data_address = value.get("data_address")
             if data_address is not None and str(data_address).strip():
                 try:
-                    formatted_address = f"0x{int(data_address):04X}"
+                    if self.addr_hex:
+                        formatted_address = f"0x{int(data_address):04X}"
+                    else:
+                        formatted_address = str(int(data_address))
                 except (ValueError, TypeError):
                     formatted_address = str(data_address)
             else:
@@ -555,10 +596,10 @@ class GUIApp(QWidget):
 
     def format_data_field(self, value):
         """
-        Formats data column (col 8). If 'exception', shows exception code.
-        Otherwise formats as list of uint16_t words in hex (big-endian).
+        Formats data column (col 8). If exception, shows exception code.
+        Unknown FC frames show raw bytes. Everything else is uint16 words in hex.
         """
-        if value.get("function_name") == "exception":
+        if value.get("function_name", "").lower() == "exception":
             exception_code = value.get("exception_code")
             if exception_code is not None:
                 try:
@@ -567,6 +608,8 @@ class GUIApp(QWidget):
                     return f"Exception Code: {exception_code}"
             else:
                 return "Exception Code: Unknown"
+        elif value.get("message_type") == "unknown":
+            return " ".join(f"{b:02X}" for b in value["data"])
         else:
             return ", ".join(f"0x{byte:04X}" for byte in value["data"])
 
@@ -582,6 +625,27 @@ class GUIApp(QWidget):
         timestamp = frame.get("timestamp", "")
         message_type = frame.get("message_type", "")
         data = frame.get("data", [])
+
+        # When a response arrives with a known address (e.g. FC3/4 after we carry
+        # addr/qty from the pending request), merge the data into the request row
+        # so one row shows both address and actual register values.
+        if message_type == "response" and frame.get("data_address", "") != "":
+            request_key = (
+                frame["slave_id"],
+                frame["function"],
+                frame["data_qty"],
+                frame["data_address"],
+                "request",
+                frame["exception_code"],
+            )
+            if request_key in self.data_dict:
+                self.data_dict[request_key]["data"] = data
+                self.data_dict[request_key]["byte_count"] = frame.get("byte_cnt", "")
+                self.data_dict[request_key]["timestamp"] = timestamp
+                self.data_dict[request_key]["occurrences"] += 1
+                self.data_dict[request_key]["status"] = frame.get("status", "")
+                self.update_parsed_data_table()
+                return
 
         if key in self.data_dict:
             self.data_dict[key]["occurrences"] += 1
@@ -600,6 +664,7 @@ class GUIApp(QWidget):
                 "data": data,
                 "occurrences": 1,
                 "exception_code": frame["exception_code"],
+                "status": frame.get("status", ""),
                 # FC 23 additional fields
                 "read_address": frame.get("read_address", ""),
                 "read_quantity": frame.get("read_quantity", ""),
@@ -649,8 +714,13 @@ class GUIApp(QWidget):
             self.table.setItem(
                 row_position, 9, QTableWidgetItem(str(value["occurrences"]))
             )
+            status = value.get("status", "")
+            status_item = QTableWidgetItem(status)
+            if status:
+                status_item.setForeground(QColor(self.pastel_orange))
+            self.table.setItem(row_position, 10, status_item)
 
-        self.table.resizeColumnsToContents()
+        self.table.resize_columns()
 
 
 def main():

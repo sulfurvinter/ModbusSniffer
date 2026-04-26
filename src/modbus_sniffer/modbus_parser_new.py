@@ -1,3 +1,8 @@
+# Modified 2026-04-25 by Claude: carry request addr/qty into response frame so GUI can merge them
+# Modified 2026-04-26 by Claude: log trash/CRC errors; status field for qty mismatches; flush trash
+# Modified 2026-04-26 by Claude: add correct FC=0x65 Sungrow handler (combined req/resp, timeout)
+# Modified 2026-04-26 by Claude: return False (not None) for incomplete frames in all handlers
+#   so decodeModbus preserves the partial frame for the next inter-frame buffer
 from datetime import datetime
 
 
@@ -30,7 +35,13 @@ class ModbusParser:
             handler = self._get_handler(functionCode)
             if handler:
                 result = handler(buffer, frameStartIndex, unitIdentifier, functionCode)
+                if result is False:
+                    # Handler signalled "frame incomplete — stop and return remaining
+                    # bytes so they're prepended to the next inter-frame buffer."
+                    buffer = buffer[frameStartIndex:]
+                    break
                 if result:
+                    self._flush_trash()
                     if self.on_parsed:
                         self.on_parsed(result)
                     buffer = buffer[self.bufferIndex :]
@@ -41,6 +52,7 @@ class ModbusParser:
             buffer = buffer[frameStartIndex + 1 :]
             self.bufferIndex = 0
 
+        self._flush_trash()
         return buffer
 
     def _get_handler(self, fc):
@@ -49,9 +61,16 @@ class ModbusParser:
                 key = (sid, fc)
                 if key not in self.pendingRequests:
                     self.pendingRequests[key] = ("request", datetime.now().isoformat())
-                    return request_handler(buffer, start, sid, fc)
+                    result = request_handler(buffer, start, sid, fc)
+                    if result is None or result is False:
+                        # Handler failed or signalled incomplete — remove sentinel
+                        # so the next attempt (or next frame) isn't misidentified
+                        # as a response.
+                        self.pendingRequests.pop(key, None)
+                    return result
                 else:
-                    self.pendingRequests.pop(key, None)
+                    # Don't pop here — response handlers pop themselves so FC3/4
+                    # can retrieve addr/qty stored by the request handler.
                     return response_handler(buffer, start, sid, fc)
 
             return dynamic_handler
@@ -74,7 +93,9 @@ class ModbusParser:
                 self._handle_write_multiple, self._handle_write_multiple_response
             ),
             23: wrapper(self._handle_read_write, self._handle_read_write_response),
-        }.get(fc, self._handle_exception if fc >= 0x80 else None)
+            # Sungrow proprietary FC=0x65: single handler decides req/resp internally
+            0x65: self._handle_sungrow_fc65,
+        }.get(fc, self._handle_exception if fc >= 0x80 else self._handle_unknown_fc)
 
     def _is_response_frame(self, buffer, fc, start_index):
         try:
@@ -94,8 +115,18 @@ class ModbusParser:
             self.trashdataf += f" {byte:02x}"
         else:
             self.trashdata = True
-            self.trashdataf = f"\033[33mWarning \033[0m: Ignoring data: [{byte:02x}"
+            self.trashdataf = f"[{byte:02x}"
         self.bufferIndex = index + 1
+
+    def _flush_trash(self):
+        if self.trashdata:
+            self.log.info(f"⚠ Trash bytes discarded: {self.trashdataf}]")
+            self.trashdata = False
+            self.trashdataf = ""
+
+    def _log_crc_error(self, buffer, start, end, fc):
+        raw = " ".join(f"{b:02x}" for b in buffer[start:end])
+        self.log.info(f"⚠ CRC Error [FC=0x{fc:02x}]: [{raw}]")
 
     def _log_raw(self, buffer, start, end):
         if self.raw_log:
@@ -146,6 +177,7 @@ class ModbusParser:
             "write_quantity": "",  # Quantity of registers to write (FC 23)
             # Optional field for exception responses
             "exception_code": "",  # Exception code if an error response is returned
+            "status": "",  # Non-empty when something looks wrong (e.g. qty mismatch)
         }
         default_frame.update(kwargs)
         return default_frame
@@ -153,16 +185,18 @@ class ModbusParser:
     # ---------- Handler Implementations ----------
     def _handle_read_bits(self, buffer, start, sid, fc):
         if len(buffer) < start + 8:
-            return None
+            return False
         read_address = (buffer[self.bufferIndex] << 8) + buffer[self.bufferIndex + 1]
         self.bufferIndex += 2
         read_qty = (buffer[self.bufferIndex] << 8) + buffer[self.bufferIndex + 1]
         self.bufferIndex += 2
-        crc_valid = self._validate_crc(buffer, self.bufferIndex)
-        self.bufferIndex += 2
-        if not crc_valid:
+        if not self._validate_crc(buffer, self.bufferIndex):
+            self._log_crc_error(buffer, start, self.bufferIndex + 2, fc)
             return None
+        self.bufferIndex += 2
         self._log_raw(buffer, start, self.bufferIndex)
+        # Store addr/qty so the response handler can carry them into its frame
+        self.pendingRequests[(sid, fc)] = (read_address, read_qty, datetime.now().isoformat())
         self._log_data(
             f"Master\t-> ID: {sid}, FC: 0x{fc:02x}, Read address: {read_address}, Read Quantity: {read_qty}"
         )
@@ -176,7 +210,7 @@ class ModbusParser:
             function=fc,
             data_address=read_address,
             data_qty=read_qty,
-            # Additional parser data for table view gnerator
+            # Additional parser data for table view generator
             direction="master",
             message_type="request",
             function_name=fname,
@@ -184,15 +218,15 @@ class ModbusParser:
 
     def _handle_read_registers(self, buffer, start, sid, fc):
         if len(buffer) < start + 8:
-            return None
+            return False
         read_address = (buffer[self.bufferIndex] << 8) + buffer[self.bufferIndex + 1]
         self.bufferIndex += 2
         read_qty = (buffer[self.bufferIndex] << 8) + buffer[self.bufferIndex + 1]
         self.bufferIndex += 2
-        crc_valid = self._validate_crc(buffer, self.bufferIndex)
-        self.bufferIndex += 2
-        if not crc_valid:
+        if not self._validate_crc(buffer, self.bufferIndex):
+            self._log_crc_error(buffer, start, self.bufferIndex + 2, fc)
             return None
+        self.bufferIndex += 2
         self._log_raw(buffer, start, self.bufferIndex)
         self.pendingRequests[(sid, fc)] = (
             read_address,
@@ -220,15 +254,15 @@ class ModbusParser:
 
     def _handle_write_single(self, buffer, start, sid, fc):
         if len(buffer) < start + 8:
-            return None
+            return False
         addr = (buffer[self.bufferIndex] << 8) + buffer[self.bufferIndex + 1]
         self.bufferIndex += 2
         data = buffer[self.bufferIndex : self.bufferIndex + 2]
         self.bufferIndex += 2
-        crc_valid = self._validate_crc(buffer, self.bufferIndex)
-        self.bufferIndex += 2
-        if not crc_valid:
+        if not self._validate_crc(buffer, self.bufferIndex):
+            self._log_crc_error(buffer, start, self.bufferIndex + 2, fc)
             return None
+        self.bufferIndex += 2
         self._log_raw(buffer, start, self.bufferIndex)
         self._log_data(
             f"Master\t-> ID: {sid}, FC: 0x{fc:02x}, Write addr: {addr}, Data: {int.from_bytes(data, 'big')}"
@@ -253,7 +287,10 @@ class ModbusParser:
 
     def _handle_write_multiple(self, buffer, start, sid, fc):
         if len(buffer) < start + 9:
-            return None
+            return False
+        byte_count = buffer[start + 6]  # peek: slave+fc+addr(2)+qty(2)+byte_count
+        if len(buffer) < start + 7 + byte_count + 2:
+            return False
         addr = (buffer[self.bufferIndex] << 8) + buffer[self.bufferIndex + 1]
         self.bufferIndex += 2
         qty = (buffer[self.bufferIndex] << 8) + buffer[self.bufferIndex + 1]
@@ -262,10 +299,10 @@ class ModbusParser:
         self.bufferIndex += 1
         data = buffer[self.bufferIndex : self.bufferIndex + byte_count]
         self.bufferIndex += byte_count
-        crc_valid = self._validate_crc(buffer, self.bufferIndex)
-        self.bufferIndex += 2
-        if not crc_valid:
+        if not self._validate_crc(buffer, self.bufferIndex):
+            self._log_crc_error(buffer, start, self.bufferIndex + 2, fc)
             return None
+        self.bufferIndex += 2
         self._log_raw(buffer, start, self.bufferIndex)
         fname = "Write Multiple Coils" if fc == 15 else "Write Multiple Registers"
         values = self._parse_data_words(data) if fc == 16 else list(data)
@@ -290,7 +327,10 @@ class ModbusParser:
 
     def _handle_read_write(self, buffer, start, sid, fc):
         if len(buffer) < start + 13:
-            return None
+            return False
+        byte_count = buffer[start + 10]  # peek: slave+fc+raddr(2)+rqty(2)+waddr(2)+wqty(2)+byte_count
+        if len(buffer) < start + 11 + byte_count + 2:
+            return False
         read_address = (buffer[self.bufferIndex] << 8) + buffer[self.bufferIndex + 1]
         self.bufferIndex += 2
         read_qty = (buffer[self.bufferIndex] << 8) + buffer[self.bufferIndex + 1]
@@ -305,6 +345,7 @@ class ModbusParser:
         self.bufferIndex += byte_count
 
         if not self._validate_crc(buffer, self.bufferIndex):
+            self._log_crc_error(buffer, start, self.bufferIndex + 2, fc)
             return None
         self.bufferIndex += 2
         self._log_raw(buffer, start, self.bufferIndex)
@@ -335,12 +376,116 @@ class ModbusParser:
             function_name="Read/Write Multiple Registers",
         )
 
+    def _handle_sungrow_fc65(self, buffer, start, sid, fc):
+        # Sungrow FC=0x65: [slave][0x65][sub][addr][byte_count][data×N][CRC×2]
+        # Request: byte_count=2 (seq only). Response: byte_count=6 (seq + 32-bit value).
+        # byte_count=6 is unambiguously a response; byte_count=2 uses pendingRequests.
+        if len(buffer) < start + 7:  # need at least slave+fc+sub+addr+count+0data+2crc
+            return False  # incomplete — keep buffer for next inter-frame gap
+        byte_count = buffer[start + 4]  # peek before advancing bufferIndex
+        if len(buffer) < start + 5 + byte_count + 2:
+            return False  # incomplete — keep buffer for next inter-frame gap
+
+        sub = buffer[self.bufferIndex]; self.bufferIndex += 1
+        addr = buffer[self.bufferIndex]; self.bufferIndex += 1
+        byte_count = buffer[self.bufferIndex]; self.bufferIndex += 1
+        data = list(buffer[self.bufferIndex : self.bufferIndex + byte_count])
+        self.bufferIndex += byte_count
+
+        if not self._validate_crc(buffer, self.bufferIndex):
+            self._log_crc_error(buffer, start, self.bufferIndex + 2, fc)
+            return None
+        self.bufferIndex += 2
+        self._log_raw(buffer, start, self.bufferIndex)
+
+        key = (sid, fc)
+        data_address = (sub << 8) | addr
+        seq = (data[0] << 8) + data[1] if len(data) >= 2 else None
+        value32 = int.from_bytes(bytes(data[2:6]), "big") if len(data) >= 6 else None
+
+        # Determine direction: 6-byte payload is always a response.
+        # 2-byte payload is a request unless a fresh pending request is waiting.
+        is_response = byte_count == 6
+        if not is_response and key in self.pendingRequests:
+            stored = self.pendingRequests[key]
+            if isinstance(stored, tuple) and len(stored) == 3:
+                try:
+                    age_ms = (datetime.now() - datetime.fromisoformat(stored[2])).total_seconds() * 1000
+                    if age_ms <= 500:
+                        is_response = True
+                    else:
+                        self.log.info(f"⚠ FC=0x65 stale request expired (age {age_ms:.0f}ms), treating new frame as request")
+                        self.pendingRequests.pop(key)
+                except Exception:
+                    self.pendingRequests.pop(key, None)
+            else:
+                is_response = True  # sentinel or unknown — treat as response
+
+        if is_response:
+            self.pendingRequests.pop(key, None)
+            if value32 is not None:
+                self._log_data(
+                    f"Slave\t-> ID: {sid}, FC: 0x{fc:02x}, Sub: 0x{sub:02x}, Addr: 0x{addr:02x}"
+                    f", Seq: {seq}, Value32: {value32} (0x{value32:08X})"
+                )
+                display_data = [value32]
+            else:
+                self._log_data(
+                    f"Slave\t-> ID: {sid}, FC: 0x{fc:02x}, Sub: 0x{sub:02x}, Addr: 0x{addr:02x}"
+                    + (f", Seq: {seq}" if seq is not None else "")
+                )
+                display_data = data
+            return self._common_frame(
+                slave_id=sid, function=fc, function_name="Sungrow 32-bit R/W",
+                data_address=data_address, byte_cnt=byte_count, data=display_data,
+                direction="slave", message_type="response",
+            )
+        else:
+            self._log_data(
+                f"Master\t-> ID: {sid}, FC: 0x{fc:02x}, Sub: 0x{sub:02x}, Addr: 0x{addr:02x}"
+                + (f", Seq: {seq}" if seq is not None else "")
+            )
+            self.pendingRequests[key] = (data_address, byte_count, datetime.now().isoformat())
+            return self._common_frame(
+                slave_id=sid, function=fc, function_name="Sungrow 32-bit R/W",
+                data_address=data_address, byte_cnt=byte_count, data=data,
+                direction="master", message_type="request",
+            )
+
+    # Known proprietary FC names for FCs without a dedicated handler
+    _PROPRIETARY_FC_NAMES: dict = {}
+
+    def _handle_unknown_fc(self, buffer, start, sid, fc):
+        # Scan forward up to 256 bytes looking for a valid CRC so we can
+        # determine frame boundaries without knowing the proprietary format.
+        name = self._PROPRIETARY_FC_NAMES.get(fc, f"Unknown FC 0x{fc:02x}")
+        payload_start = self.bufferIndex
+        scan_end = min(start + 256, len(buffer))
+        for end in range(payload_start, scan_end):
+            if self._validate_crc(buffer, end):
+                raw_payload = list(buffer[payload_start:end])
+                self.bufferIndex = end + 2
+                raw_str = " ".join(f"{b:02x}" for b in buffer[start:self.bufferIndex])
+                self.log.info(
+                    f"⚠ {name} [slave={sid}]: [{raw_str}]"
+                )
+                return self._common_frame(
+                    slave_id=sid,
+                    function=fc,
+                    function_name=name,
+                    message_type="unknown",
+                    status="Vendor/proprietary FC",
+                    data=raw_payload,
+                )
+        return None  # no CRC found — fall through to trash handling
+
     def _handle_exception(self, buffer, start, sid, fc):
         if len(buffer) < start + 5:
-            return None
+            return False
         exception_code = buffer[self.bufferIndex]
         self.bufferIndex += 1
         if not self._validate_crc(buffer, self.bufferIndex):
+            self._log_crc_error(buffer, start, self.bufferIndex + 2, fc)
             return None
         self.bufferIndex += 2
         self._log_raw(buffer, start, self.bufferIndex)
@@ -360,14 +505,16 @@ class ModbusParser:
 
     def _handle_read_bits_response(self, buffer, start, sid, fc):
         if len(buffer) < start + 5:
-            return None
+            return False
+        byte_count = buffer[start + 2]  # peek
+        if len(buffer) < start + 3 + byte_count + 2:
+            return False
         byte_count = buffer[self.bufferIndex]
         self.bufferIndex += 1
-        if len(buffer) < self.bufferIndex + byte_count + 2:
-            return None
         data = buffer[self.bufferIndex : self.bufferIndex + byte_count]
         self.bufferIndex += byte_count
         if not self._validate_crc(buffer, self.bufferIndex):
+            self._log_crc_error(buffer, start, self.bufferIndex + 2, fc)
             return None
         self.bufferIndex += 2
         self._log_raw(buffer, start, self.bufferIndex)
@@ -376,14 +523,24 @@ class ModbusParser:
         self._log_data(
             f"Slave\t-> ID: {sid}, FC: 0x{fc:02x}, Read byte count: {byte_count}, Data: {values}"
         )
-        self._log_csv(datetime.now().isoformat(), sid, "READ", "", len(values), values)
+        request_info = self.pendingRequests.pop((sid, fc), None)
+        addr, qty = "", ""
+        status = ""
+        if isinstance(request_info, tuple) and len(request_info) == 3:
+            addr, qty, _ = request_info
+            if qty != "" and len(values) != qty:
+                status = f"Qty mismatch: req {qty} got {len(values)}"
+        self._log_csv(datetime.now().isoformat(), sid, "READ", addr, len(values), values)
         return self._common_frame(
             # MODBUS Application Protocol Specification V1.1b value set
             slave_id=sid,
             function=fc,
             byte_cnt=byte_count,
             data=values,
-            # Additional parser data for table view gnerator
+            data_address=addr,
+            data_qty=qty,
+            status=status,
+            # Additional parser data for table view generator
             direction="slave",
             message_type="response",
             function_name=fname,
@@ -391,14 +548,16 @@ class ModbusParser:
 
     def _handle_read_registers_response(self, buffer, start, sid, fc):
         if len(buffer) < start + 5:
-            return None
+            return False
+        byte_count = buffer[start + 2]  # peek
+        if len(buffer) < start + 3 + byte_count + 2:
+            return False
         byte_count = buffer[self.bufferIndex]
         self.bufferIndex += 1
-        if len(buffer) < self.bufferIndex + byte_count + 2:
-            return None
         data = buffer[self.bufferIndex : self.bufferIndex + byte_count]
         self.bufferIndex += byte_count
         if not self._validate_crc(buffer, self.bufferIndex):
+            self._log_crc_error(buffer, start, self.bufferIndex + 2, fc)
             return None
         self.bufferIndex += 2
         self._log_raw(buffer, start, self.bufferIndex)
@@ -408,8 +567,12 @@ class ModbusParser:
             f"Slave\t-> ID: {sid}, FC: 0x{fc:02x}, Byte count: {byte_count}, Data: {values}"
         )
         request_info = self.pendingRequests.pop((sid, fc), None)
-        if request_info:
+        addr, qty = "", ""
+        status = ""
+        if isinstance(request_info, tuple) and len(request_info) == 3:
             addr, qty, _ = request_info
+            if qty != "" and len(values) != qty:
+                status = f"Qty mismatch: req {qty} got {len(values)}"
             self._log_csv(
                 datetime.now().isoformat(), sid, "READ", addr, len(values), values
             )
@@ -419,21 +582,25 @@ class ModbusParser:
             function=fc,
             byte_cnt=byte_count,
             data=values,
-            # Additional parser data for table view gnerator
+            data_address=addr,
+            data_qty=qty,
+            status=status,
+            # Additional parser data for table view generator
             direction="slave",
             message_type="response",
             function_name=fname,
-            # data_qty=byte_count//2,
         )
 
     def _handle_write_single_response(self, buffer, start, sid, fc):
         if len(buffer) < start + 8:
-            return None
+            return False
+        self.pendingRequests.pop((sid, fc), None)
         addr = (buffer[self.bufferIndex] << 8) + buffer[self.bufferIndex + 1]
         self.bufferIndex += 2
         data = buffer[self.bufferIndex : self.bufferIndex + 2]
         self.bufferIndex += 2
         if not self._validate_crc(buffer, self.bufferIndex):
+            self._log_crc_error(buffer, start, self.bufferIndex + 2, fc)
             return None
         self.bufferIndex += 2
         self._log_raw(buffer, start, self.bufferIndex)
@@ -464,12 +631,14 @@ class ModbusParser:
 
     def _handle_write_multiple_response(self, buffer, start, sid, fc):
         if len(buffer) < start + 8:
-            return None
+            return False
+        self.pendingRequests.pop((sid, fc), None)
         addr = (buffer[self.bufferIndex] << 8) + buffer[self.bufferIndex + 1]
         self.bufferIndex += 2
         qty = (buffer[self.bufferIndex] << 8) + buffer[self.bufferIndex + 1]
         self.bufferIndex += 2
         if not self._validate_crc(buffer, self.bufferIndex):
+            self._log_crc_error(buffer, start, self.bufferIndex + 2, fc)
             return None
         self.bufferIndex += 2
         self._log_raw(buffer, start, self.bufferIndex)
@@ -494,12 +663,17 @@ class ModbusParser:
 
     def _handle_read_write_response(self, buffer, start, sid, fc):
         if len(buffer) < start + 5:
-            return None
+            return False
+        byte_count = buffer[start + 2]  # peek
+        if len(buffer) < start + 3 + byte_count + 2:
+            return False
+        self.pendingRequests.pop((sid, fc), None)
         byte_count = buffer[self.bufferIndex]
         self.bufferIndex += 1
         data = buffer[self.bufferIndex : self.bufferIndex + byte_count]
         self.bufferIndex += byte_count
         if not self._validate_crc(buffer, self.bufferIndex):
+            self._log_crc_error(buffer, start, self.bufferIndex + 2, fc)
             return None
         self.bufferIndex += 2
         self._log_raw(buffer, start, self.bufferIndex)
